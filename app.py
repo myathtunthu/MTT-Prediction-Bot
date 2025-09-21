@@ -7,15 +7,19 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime
 import time
+import threading
 
 app = Flask(__name__)
 
-# Telegram Bot Token - ACTUAL TOINT PROVIDED
+# Telegram Bot Token - ACTUAL TOKEN PROVIDED
 BOT_TOKEN = "7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ"
 bot = telegram.Bot(token=BOT_TOKEN)
 
 # Store historical data
 historical_data = []
+
+# Track if initialized
+initialized = False
 
 def scrape_historical_data():
     """Scrape historical lottery data from 6winak3"""
@@ -24,12 +28,7 @@ def scrape_historical_data():
     try:
         print("Scraping historical data from 6winak3 WinGo...")
         
-        # ACTUAL SCRAPING LOGIC FOR 6WINAK3
-        # This would need to be adapted to the actual site structure
-        url = "https://6winak3.com/#/home/AllLotteryGames/WinGo?id=1"
-        
-        # Mock data simulation (replace with actual scraping)
-        # In real implementation, use requests + BeautifulSoup to extract data
+        # Mock data simulation
         mock_data = [
             {'draw_id': '1001', 'color': 'Red', 'number': 5, 'timestamp': '2024-01-15 14:30:00'},
             {'draw_id': '1002', 'color': 'Blue', 'number': 2, 'timestamp': '2024-01-15 15:30:00'},
@@ -87,8 +86,30 @@ def predict_based_on_history():
     
     return predicted_color, predicted_number, confidence
 
+def initialize_app():
+    """Initialize the application with data"""
+    global initialized
+    if not initialized:
+        print("Initializing bot with token: 7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ")
+        scrape_historical_data()
+        
+        # Try to set webhook automatically
+        try:
+            webhook_url = "https://your-bot-name.onrender.com/webhook"  # CHANGE THIS TO YOUR RENDER URL
+            set_webhook_url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}"
+            response = requests.get(set_webhook_url)
+            print(f"Webhook set: {response.json()}")
+        except Exception as e:
+            print(f"Webhook setup failed: {e} - set manually at: https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url=YOUR_RENDER_URL/webhook")
+        
+        initialized = True
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    # Initialize on first request
+    if not initialized:
+        initialize_app()
+    
     try:
         update = telegram.Update.de_json(request.get_json(), bot)
         
@@ -167,21 +188,25 @@ def webhook():
 
 @app.route('/')
 def home():
+    # Initialize on first request
+    if not initialized:
+        initialize_app()
+    
     return "🎯 WinGo Lottery Prediction Bot is LIVE! Token: 7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ"
 
-# Initialize data on server start
-@app.before_first_request
-def initialize():
-    print("Initializing bot with token: 7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ")
-    scrape_historical_data()
-    # Set webhook automatically
-    try:
-        webhook_url = "https://your-bot-name.onrender.com/webhook"
-        set_webhook = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}"
-        requests.get(set_webhook)
-        print("Webhook set successfully")
-    except:
-        print("Webhook setup failed - set manually")
+@app.route('/init')
+def manual_init():
+    """Manual initialization endpoint"""
+    initialize_app()
+    return "Bot initialized successfully!"
+
+# Initialize when the app starts
+with app.app_context():
+    # Use thread to avoid blocking
+    init_thread = threading.Thread(target=initialize_app)
+    init_thread.daemon = True
+    init_thread.start()
 
 if __name__ == '__main__':
+    initialize_app()  # Initialize immediately when running locally
     app.run(host='0.0.0.0', port=5000)
