@@ -93,7 +93,7 @@ def webhook():
         update = telegram.Update.de_json(request.get_json(), bot)
         
         if update.message and update.message.text:
-text = update.message.text.lower()
+            text = update.message.text.lower()
             chat_id = update.message.chat_id
             
             if text == '/start':
