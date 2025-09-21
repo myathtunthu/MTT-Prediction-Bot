@@ -7,109 +7,60 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime
 import time
-import threading
 
 app = Flask(__name__)
 
-# Telegram Bot Token - ACTUAL TOKEN PROVIDED
+# Telegram Bot Token
 BOT_TOKEN = "7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ"
 bot = telegram.Bot(token=BOT_TOKEN)
 
 # Store historical data
 historical_data = []
 
-# Track if initialized
-initialized = False
+def setup_webhook():
+    """Automatically set webhook on Render"""
+    try:
+        # Get Render URL automatically (for Render environment)
+        render_url = os.getenv('RENDER_EXTERNAL_URL', 'https://your-bot-name.onrender.com')
+        webhook_url = f"{render_url}/webhook"
+        
+        # Set webhook
+        set_webhook_url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}"
+        response = requests.get(set_webhook_url)
+        
+        print(f"Webhook setup attempted: {webhook_url}")
+        print(f"Telegram response: {response.json()}")
+        
+        return response.json().get('ok', False)
+    except Exception as e:
+        print(f"Webhook setup error: {str(e)}")
+        return False
 
 def scrape_historical_data():
-    """Scrape historical lottery data from 6winak3"""
+    """Scrape historical lottery data"""
     global historical_data
-    
     try:
-        print("Scraping historical data from 6winak3 WinGo...")
+        print("Scraping historical data...")
         
-        # Mock data simulation
+        # Mock data for demonstration
         mock_data = [
             {'draw_id': '1001', 'color': 'Red', 'number': 5, 'timestamp': '2024-01-15 14:30:00'},
             {'draw_id': '1002', 'color': 'Blue', 'number': 2, 'timestamp': '2024-01-15 15:30:00'},
             {'draw_id': '1003', 'color': 'Green', 'number': 8, 'timestamp': '2024-01-15 16:30:00'},
             {'draw_id': '1004', 'color': 'Red', 'number': 3, 'timestamp': '2024-01-15 17:30:00'},
-            {'draw_id': '1005', 'color': 'Blue', 'number': 7, 'timestamp': '2024-01-15 18:30:00'},
-            {'draw_id': '1006', 'color': 'Green', 'number': 1, 'timestamp': '2024-01-15 19:30:00'},
-            {'draw_id': '1007', 'color': 'Red', 'number': 9, 'timestamp': '2024-01-15 20:30:00'},
-            {'draw_id': '1008', 'color': 'Blue', 'number': 4, 'timestamp': '2024-01-15 21:30:00'},
-            {'draw_id': '1009', 'color': 'Green', 'number': 6, 'timestamp': '2024-01-15 22:30:00'},
-            {'draw_id': '1010', 'color': 'Red', 'number': 2, 'timestamp': '2024-01-15 23:30:00'}
+            {'draw_id': '1005', 'color': 'Blue', 'number': 7, 'timestamp': '2024-01-15 18:30:00'}
         ]
         
         historical_data = mock_data
-        print(f"Successfully loaded {len(historical_data)} historical records")
+        print(f"Loaded {len(historical_data)} historical records")
         return True
         
     except Exception as e:
         print(f"Scraping error: {str(e)}")
         return False
 
-def predict_based_on_history():
-    """Make prediction based on historical data analysis"""
-    if not historical_data:
-        return "Red", 5, 50  # Default prediction if no data
-    
-    # Analyze last 10 records for pattern detection
-    recent_data = historical_data[-10:] if len(historical_data) >= 10 else historical_data
-    
-    # Color frequency analysis
-    color_count = {'Red': 0, 'Blue': 0, 'Green': 0}
-    for data in recent_data:
-        if data['color'] in color_count:
-            color_count[data['color']] += 1
-    
-    # Predict color with best probability
-    predicted_color = min(color_count, key=color_count.get)
-    
-    # Number pattern analysis - avoid recently drawn numbers
-    recent_numbers = [data['number'] for data in recent_data[-5:]]  # Last 5 numbers
-    available_numbers = [n for n in range(1, 11) if n not in recent_numbers]
-    
-    if available_numbers:
-        predicted_number = random.choice(available_numbers)
-    else:
-        # If all numbers recently appeared, choose least frequent
-        number_count = {n: 0 for n in range(1, 11)}
-        for data in recent_data:
-            number_count[data['number']] += 1
-        predicted_number = min(number_count, key=number_count.get)
-    
-    # Confidence calculation based on data quality
-    confidence = 60 + min(20, len(historical_data) // 2)
-    confidence = min(confidence, 85)
-    
-    return predicted_color, predicted_number, confidence
-
-def initialize_app():
-    """Initialize the application with data"""
-    global initialized
-    if not initialized:
-        print("Initializing bot with token: 7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ")
-        scrape_historical_data()
-        
-        # Try to set webhook automatically
-        try:
-            webhook_url = "https://your-bot-name.onrender.com/webhook"  # CHANGE THIS TO YOUR RENDER URL
-            set_webhook_url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}"
-            response = requests.get(set_webhook_url)
-            print(f"Webhook set: {response.json()}")
-        except Exception as e:
-            print(f"Webhook setup failed: {e} - set manually at: https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url=YOUR_RENDER_URL/webhook")
-        
-        initialized = True
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # Initialize on first request
-    if not initialized:
-        initialize_app()
-    
     try:
         update = telegram.Update.de_json(request.get_json(), bot)
         
@@ -118,24 +69,8 @@ def webhook():
             chat_id = update.message.chat_id
             
             if text == '/start':
-                welcome_msg = (
-                    "🎲 **WinGo Lottery Prediction Bot** 🎲\n\n"
-                    "I provide data-driven predictions for 6winak3 WinGo lottery!\n\n"
-                    "📊 **Commands:**\n"
-                    "/predict - Get prediction for next draw\n"
-                    "/scrape - Update historical data\n"
-                    "/history - Show recent results\n"
-                    "/stats - Show prediction statistics"
-                )
-                bot.send_message(chat_id=chat_id, text=welcome_msg, parse_mode='Markdown')
-                
-            elif text == '/scrape':
-                bot.send_message(chat_id=chat_id, text="🔄 Scraping historical data...")
-                success = scrape_historical_data()
-                if success:
-                    bot.send_message(chat_id=chat_id, text=f"✅ Success! Loaded {len(historical_data)} records. Use /predict")
-                else:
-                    bot.send_message(chat_id=chat_id, text="❌ Scraping failed. Using existing data.")
+                response_text = "Hi! I am your lottery prediction bot. Use /predict for predictions."
+                bot.send_message(chat_id=chat_id, text=response_text)
                 
             elif text == '/predict':
                 if not historical_data:
@@ -143,70 +78,41 @@ def webhook():
                 
                 color, number, confidence = predict_based_on_history()
                 
-                prediction_msg = (
-                    f"🎯 **WinGo Prediction** 🎯\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"• 🎨 Color: **{color}**\n"
-                    f"• 🔢 Number: **{number}**\n"
-                    f"• 📊 Confidence: **{confidence}%**\n"
-                    f"• 🗃️ Data points: {len(historical_data)} records\n\n"
-                    f"💡 Based on historical pattern analysis\n"
-                    f"⚠️ Remember: Lottery predictions are not guaranteed"
+                prediction_message = (
+                    f"🎯 **Prediction** 🎯\n"
+                    f"• Color: {color}\n"
+                    f"• Number: {number}\n"
+                    f"• Confidence: {confidence}%\n"
+                    f"• Data: {len(historical_data)} records"
                 )
                 
-                bot.send_message(chat_id=chat_id, text=prediction_msg, parse_mode='Markdown')
-                
-            elif text == '/history':
-                if historical_data:
-                    history_msg = "📈 Last 5 Results:\n━━━━━━━━━━━━━━━━━━━━\n"
-                    for data in historical_data[-5:]:
-                        history_msg += f"• {data['color']} {data['number']} - {data['timestamp']}\n"
-                    bot.send_message(chat_id=chat_id, text=history_msg)
-                else:
-                    bot.send_message(chat_id=chat_id, text="No data available. Use /scrape first.")
-                    
-            elif text == '/stats':
-                stats_msg = (
-                    f"📊 **Bot Statistics**\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"• Historical records: {len(historical_data)}\n"
-                    f"• Last update: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
-                    f"• Prediction accuracy: ~65-85%\n"
-                    f"• Data source: 6winak3 WinGo"
-                )
-                bot.send_message(chat_id=chat_id, text=stats_msg, parse_mode='Markdown')
+                bot.send_message(chat_id=chat_id, text=prediction_message, parse_mode='Markdown')
                 
             else:
-                help_msg = "❓ Unknown command. Available commands:\n/predict /scrape /history /stats"
-                bot.send_message(chat_id=chat_id, text=help_msg)
+                bot.send_message(chat_id=chat_id, text="Use /predict for prediction")
         
         return 'OK', 200
         
     except Exception as e:
-        print(f"Webhook error: {str(e)}")
+        print(f"Error: {str(e)}")
         return 'Error', 500
 
 @app.route('/')
 def home():
-    # Initialize on first request
-    if not initialized:
-        initialize_app()
-    
-    return "🎯 WinGo Lottery Prediction Bot is LIVE! Token: 7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ"
+    return "Telegram Bot is running! Webhook should be auto-configured."
 
-@app.route('/init')
-def manual_init():
-    """Manual initialization endpoint"""
-    initialize_app()
-    return "Bot initialized successfully!"
+@app.route('/setwebhook')
+def manual_webhook_setup():
+    """Manual webhook setup route"""
+    success = setup_webhook()
+    return f"Webhook setup {'successful' if success else 'failed'}"
 
-# Initialize when the app starts
-with app.app_context():
-    # Use thread to avoid blocking
-    init_thread = threading.Thread(target=initialize_app)
-    init_thread.daemon = True
-    init_thread.start()
+# Initialize on server start
+@app.before_first_request
+def initialize():
+    print("Initializing bot...")
+    scrape_historical_data()
+    setup_webhook()
 
 if __name__ == '__main__':
-    initialize_app()  # Initialize immediately when running locally
     app.run(host='0.0.0.0', port=5000)
