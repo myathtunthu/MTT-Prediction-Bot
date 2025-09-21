@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 import time
 
-app = Flask(name)
+app = Flask(__name__)
 
 # Telegram Bot Token - ACTUAL TOINT PROVIDED
 BOT_TOKEN = "7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ"
@@ -98,9 +98,9 @@ def webhook():
             
             if text == '/start':
                 welcome_msg = (
-                    "🎲 WinGo Lottery Prediction Bot 🎲\n\n"
+                    "🎲 **WinGo Lottery Prediction Bot** 🎲\n\n"
                     "I provide data-driven predictions for 6winak3 WinGo lottery!\n\n"
-                    "📊 Commands:\n"
+                    "📊 **Commands:**\n"
                     "/predict - Get prediction for next draw\n"
                     "/scrape - Update historical data\n"
                     "/history - Show recent results\n"
@@ -123,11 +123,11 @@ def webhook():
                 color, number, confidence = predict_based_on_history()
                 
                 prediction_msg = (
-                    f"🎯 WinGo Prediction 🎯\n"
+                    f"🎯 **WinGo Prediction** 🎯\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"• 🎨 Color: {color}\n"
-                    f"• 🔢 Number: {number}\n"
-                    f"• 📊 Confidence: {confidence}%\n"
+                    f"• 🎨 Color: **{color}**\n"
+                    f"• 🔢 Number: **{number}**\n"
+                    f"• 📊 Confidence: **{confidence}%**\n"
                     f"• 🗃️ Data points: {len(historical_data)} records\n\n"
                     f"💡 Based on historical pattern analysis\n"
                     f"⚠️ Remember: Lottery predictions are not guaranteed"
@@ -146,7 +146,7 @@ def webhook():
                     
             elif text == '/stats':
                 stats_msg = (
-                    f"📊 Bot Statistics\n"
+                    f"📊 **Bot Statistics**\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
                     f"• Historical records: {len(historical_data)}\n"
                     f"• Last update: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
@@ -174,7 +174,7 @@ def home():
 def initialize():
     print("Initializing bot with token: 7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ")
     scrape_historical_data()
-# Set webhook automatically
+    # Set webhook automatically
     try:
         webhook_url = "https://your-bot-name.onrender.com/webhook"
         set_webhook = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}"
@@ -183,5 +183,5 @@ def initialize():
     except:
         print("Webhook setup failed - set manually")
 
-if name == 'main':
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
