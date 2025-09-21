@@ -20,7 +20,7 @@ historical_data = []
 def setup_webhook():
     """Automatically set webhook on Render"""
     try:
-        # Get Render URL automatically (for Render environment)
+        # Get Render URL automatically
         render_url = os.getenv('RENDER_EXTERNAL_URL', 'https://your-bot-name.onrender.com')
         webhook_url = f"{render_url}/webhook"
         
@@ -59,6 +59,34 @@ def scrape_historical_data():
         print(f"Scraping error: {str(e)}")
         return False
 
+def predict_based_on_history():
+    """Make prediction based on historical data"""
+    if not historical_data:
+        return "Red", 5, 50
+    
+    # Simple prediction algorithm
+    recent_data = historical_data[-5:] if len(historical_data) >= 5 else historical_data
+    
+    color_count = {}
+    for data in recent_data:
+        color = data['color']
+        color_count[color] = color_count.get(color, 0) + 1
+    
+    predicted_color = min(color_count, key=color_count.get)
+    
+    recent_numbers = [data['number'] for data in recent_data]
+    possible_numbers = [n for n in range(1, 11) if n not in recent_numbers]
+    
+    if possible_numbers:
+        predicted_number = random.choice(possible_numbers)
+    else:
+        predicted_number = random.randint(1, 10)
+    
+    confidence = 60 + (len(historical_data) * 2)
+    confidence = min(confidence, 85)
+    
+    return predicted_color, predicted_number, confidence
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
@@ -69,8 +97,12 @@ def webhook():
             chat_id = update.message.chat_id
             
             if text == '/start':
-                response_text = "Hi! I am your lottery prediction bot. Use /predict for predictions."
+                response_text = "Hi! I am your lottery prediction bot. Use /predict for predictions or /scrape to update data."
                 bot.send_message(chat_id=chat_id, text=response_text)
+                
+            elif text == '/scrape':
+                scrape_historical_data()
+                bot.send_message(chat_id=chat_id, text=f"✅ Scraped {len(historical_data)} historical records. Use /predict for prediction.")
                 
             elif text == '/predict':
                 if not historical_data:
@@ -83,23 +115,32 @@ def webhook():
                     f"• Color: {color}\n"
                     f"• Number: {number}\n"
                     f"• Confidence: {confidence}%\n"
-                    f"• Data: {len(historical_data)} records"
+                    f"• Historical data: {len(historical_data)} records"
                 )
                 
                 bot.send_message(chat_id=chat_id, text=prediction_message, parse_mode='Markdown')
                 
+            elif text == '/history':
+                if historical_data:
+                    history_text = f"Last {min(5, len(historical_data))} results:\n"
+                    for data in historical_data[-5:]:
+                        history_text += f"• {data['color']} {data['number']} ({data['timestamp']})\n"
+                    bot.send_message(chat_id=chat_id, text=history_text)
+                else:
+                    bot.send_message(chat_id=chat_id, text="No historical data. Use /scrape first.")
+                
             else:
-                bot.send_message(chat_id=chat_id, text="Use /predict for prediction")
+                bot.send_message(chat_id=chat_id, text="Commands: /predict, /scrape, /history")
         
         return 'OK', 200
         
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Webhook error: {str(e)}")
         return 'Error', 500
 
 @app.route('/')
 def home():
-    return "Telegram Bot is running! Webhook should be auto-configured."
+    return "Telegram Bot is running! Use /setwebhook to configure webhook."
 
 @app.route('/setwebhook')
 def manual_webhook_setup():
@@ -107,12 +148,20 @@ def manual_webhook_setup():
     success = setup_webhook()
     return f"Webhook setup {'successful' if success else 'failed'}"
 
-# Initialize on server start
-@app.before_first_request
+@app.route('/init')
 def initialize():
-    print("Initializing bot...")
+    """Manual initialization endpoint"""
     scrape_historical_data()
-    setup_webhook()
+    webhook_success = setup_webhook()
+    return f"Bot initialized! Scraped {len(historical_data)} records. Webhook: {'success' if webhook_success else 'failed'}"
+
+# Remove the deprecated before_first_request and use manual initialization
+# The /init endpoint can be called once after deployment
 
 if __name__ == '__main__':
+    # Initialize on app start
+    print("Starting bot initialization...")
+    scrape_historical_data()
+    setup_webhook()
+    print("Bot started successfully!")
     app.run(host='0.0.0.0', port=5000)
