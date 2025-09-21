@@ -11,7 +11,7 @@ import time
 app = Flask(__name__)
 
 # Telegram Bot Token
-BOT_TOKEN = os.getenv('7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ')
+BOT_TOKEN = os.getenv(7783839439:AAHSd5_N6NmAYlL3d7OLWq3Wc3RVvnYhyzQ)
 bot = telegram.Bot(token=BOT_TOKEN)
 
 # Store historical data
